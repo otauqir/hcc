@@ -8,7 +8,7 @@
 	branch = amd-hcc
 [submodule "clang"]
 	path = clang
-	url = https://github.com/RadeonOpenCompute/hcc-clang-upgrade.git
+	url = https://github.com/otauqir/hcc-clang-upgrade.git
 	branch = clang_tot_upgrade
 [submodule "compiler-rt"]
 	path = compiler-rt
