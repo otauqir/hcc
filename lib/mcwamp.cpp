@@ -15,9 +15,30 @@
 #include <mutex>
 
 #include "mcwamp_impl.hpp"
-#include "hc_rt_debug.h"
+//#include "hc_rt_debug.h"
 
-#include <dlfcn.h>
+#ifdef linux
+  #include <dlfcn.h>
+  #define LOAD_LIBRARY(LIBRARY_NAME) dlopen((LIBRARY_NAME), RTLD_LAZY|RTLD_NODELETE)
+  #define LOAD_FUNCTION(LIBRARY_HANDLE, FUNC_NAME) dlsym((LIBRARY_HANDLE), (FUNC_NAME))
+  #define CLOSE_LIBRARY(LIBRARY_HANDLE) dlclose((LIBRARY_HANDLE))
+  #define LIBRARY_ERROR() dlerror()
+#elif _WIN32
+  #ifndef __GPU__
+    #define NOMINMAX
+    #include <windows.h>
+    #define LOAD_LIBRARY(LIBRARY_NAME) LoadLibrary((LIBRARY_NAME))
+    #define LOAD_FUNCTION(LIBRARY_HANDLE, FUNC_NAME) GetProcAddress((HMODULE) (LIBRARY_HANDLE), (FUNC_NAME))
+    #define CLOSE_LIBRARY(LIBRARY_HANDLE) FreeLibrary((HMODULE) (LIBRARY_HANDLE))
+    #define LIBRARY_ERROR() GetLastError()
+  #else
+    #define LOAD_LIBRARY(LIBRARY_NAME) nullptr
+    #define LOAD_FUNCTION(LIBRARY_HANDLE, FUNC_NAME) nullptr
+    #define CLOSE_LIBRARY(LIBRARY_HANDLE) 0
+    #define LIBRARY_ERROR() 0
+  #endif
+#endif
+#include "hc.hpp"
 
 namespace Concurrency {
 
@@ -42,9 +63,11 @@ struct RuntimeImpl {
     m_GetContextImpl(nullptr),
     isCPU(false) {
     //std::cout << "dlopen(" << libraryName << ")\n";
-    m_RuntimeHandle = dlopen(libraryName, RTLD_LAZY|RTLD_NODELETE);
+    //m_RuntimeHandle = dlopen(libraryName, RTLD_LAZY|RTLD_NODELETE);
+    m_RuntimeHandle = LOAD_LIBRARY(libraryName);
     if (!m_RuntimeHandle) {
-      std::cerr << "C++AMP runtime load error: " << dlerror() << std::endl;
+      //std::cerr << "C++AMP runtime load error: " << dlerror() << std::endl;
+      std::cerr << "C++AMP runtime load error: " << LIBRARY_ERROR() << std::endl;
       return;
     }
     LoadSymbols();
@@ -52,15 +75,19 @@ struct RuntimeImpl {
 
   ~RuntimeImpl() {
     if (m_RuntimeHandle) {
-      dlclose(m_RuntimeHandle);
+      //dlclose(m_RuntimeHandle);
+      CLOSE_LIBRARY(m_RuntimeHandle);
     }
   }
 
   // load symbols from C++AMP runtime implementation
   void LoadSymbols() {
-    m_PushArgImpl = (PushArgImpl_t) dlsym(m_RuntimeHandle, "PushArgImpl");
+    /*m_PushArgImpl = (PushArgImpl_t) dlsym(m_RuntimeHandle, "PushArgImpl");
     m_PushArgPtrImpl = (PushArgPtrImpl_t) dlsym(m_RuntimeHandle, "PushArgPtrImpl");
-    m_GetContextImpl= (GetContextImpl_t) dlsym(m_RuntimeHandle, "GetContextImpl");
+    m_GetContextImpl= (GetContextImpl_t) dlsym(m_RuntimeHandle, "GetContextImpl");*/
+    m_PushArgImpl = (PushArgImpl_t) LOAD_FUNCTION(m_RuntimeHandle, "PushArgImpl");
+    m_PushArgPtrImpl = (PushArgPtrImpl_t) LOAD_FUNCTION(m_RuntimeHandle, "PushArgPtrImpl");
+    m_GetContextImpl= (GetContextImpl_t) LOAD_FUNCTION(m_RuntimeHandle, "GetContextImpl");
   }
 
   void set_cpu() { isCPU = true; }
@@ -106,15 +133,18 @@ public:
     // detect if C++AMP runtime is available and
     // whether all platform library dependencies are satisfied
     //std::cout << "dlopen(" << m_ampRuntimeLibrary << ")\n";
-    handle = dlopen(m_ampRuntimeLibrary.c_str(), RTLD_LAZY|RTLD_NODELETE);
+    //handle = dlopen(m_ampRuntimeLibrary.c_str(), RTLD_LAZY|RTLD_NODELETE);
+    handle = LOAD_LIBRARY(m_ampRuntimeLibrary.c_str());
     if (!handle) {
       //std::cout << " C++AMP runtime not found" << std::endl;
       //std::cout << dlerror() << std::endl;
       return false;
     }
-    dlerror();  // clear any existing error
+    //dlerror();  // clear any existing error
+    LIBRARY_ERROR();  // clear any existing error
     //std::cout << " C++AMP runtime found" << std::endl;
-    dlclose(handle);
+    //dlclose(handle);
+    CLOSE_LIBRARY(handle);
 
     return true;
   }
