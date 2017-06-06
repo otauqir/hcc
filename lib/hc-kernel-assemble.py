@@ -15,8 +15,11 @@ if __name__ == "__main__":
     opt = bindir + "/opt"
     llvm_as = bindir + "/llvm-as"
     llvm_dis = bindir + "/llvm-dis"
-    clamp_asm = bindir + "/clamp-assemble"
     libpath = bindir + "/../lib"
+    if os.name == "nt":
+        clamp_asm = bindir + "/clamp-assemble.py"
+    else:
+        clamp_asm = bindir + "/clamp-assemble"
 
     if len(argv) != 3:
         print("Usage: %s kernel-bitcode kernel-object" % argv[0])
@@ -28,25 +31,20 @@ if __name__ == "__main__":
     if not os.path.isfile(kernel_input):
         print("kernel-bitcode %s is not valid" % kernel_input)
         exit(1)
-
+    
     temp_dir = mkdtemp()
     basename = os.path.basename(argv[2])
-    if os.name == "nt":
-        temp_name = temp_dir + '\\' + basename
-    else:
-        temp_name = temp_dir + '/' + basename
+    temp_name = temp_dir + '/' + basename
 
     if os.path.isfile(argv[2]):
         copyfile(argv[2], temp_name + ".tmp.o")
-        copyfile(argv[2], "C:\\" + basename)
-        #os.remove(argv[2])
-
+        os.remove(argv[2])
+    
     check_call([llvm_dis,
         kernel_input,
         "-o",
         temp_name + ".ll"])
 
-    #not sure if this works as inteneded
     f0 = open(temp_name + ".ll", "rb")
     if os.name == "nt":
         f1 = open("nul", "wb")
@@ -85,61 +83,40 @@ if __name__ == "__main__":
         f0.close()
         f1.close()
         f2.close()
-
+        
         check_call([llvm_as,
             temp_name + ".kernel_redirect.ll",
             "-o",
             temp_name + ".kernel_redirect.bc"])
         check_call(command + [temp_name + ".camp.s", "-emit-llvm"])
         check_call(command + [temp_name + ".camp.o"])
-        if os.name == "nt":
-            check_call(["objcopy",
-                "-R",
-                ".kernel",
-                temp_name + ".camp.o"])
-        else:
-            check_call(["objcopy",
-                "-R",
-                ".kernel",
-                temp_name + ".camp.o"])
+        check_call(["objcopy",
+            "-R",
+            ".kernel",
+            temp_name + ".camp.o"])
         check_call([llvm_link,
             temp_name + ".kernel_redirect.bc",
             temp_name + ".camp.s",
             "-o",
             temp_name + ".link.bc"])
-
-        check_call([clamp_asm,
+        check_call(["python",
+            clamp_asm,
             kernel_input + ".bc",
             temp_name + ".camp.o"])
     else:
         os.link(kernel_input, kernel_input + ".bc")
-        #copyfile(kernel_input, kernel_input + ".bc")
-        if os.name == "nt":
-            check_call(["python",
-                clamp_asm + ".py",
-                kernel_input + ".bc",
-                temp_name + ".camp.o"])
-        else:
-            check_call([clamp_asm,
-                kernel_input + ".bc",
-                temp_name + ".camp.o"])
-        #copyfile(kernel_input + ".bc", kernel_input)
+        check_call(["python",
+            clamp_asm,
+            kernel_input + ".bc",
+            temp_name + ".camp.o"])
     if os.path.isfile(temp_dir + '/' + basename + ".tmp.o"):
-        if os.name == "nt":
-            check_call(["LINK",
-                "/FORCE:MULTIPLE",
-                "/NOENTRY",
-                temp_dir + "\\" + basename + ".tmp.o",
-                temp_name + ".camp.o",
-                "/OUT:" + argv[2]])
-        else:
-            check_call(["ld",
-                "-r",
-                "--allow-multiple-definition",
-                temp_dir + '/' + basename + ".tmp.o",
-                temp_name + ".camp.o",
-                "-o",
-                argv[2]])
+        check_call(["ld",
+            "-r",
+            "--allow-multiple-definition",
+            temp_dir + '/' + basename + ".tmp.o",
+            temp_name + ".camp.o",
+            "-o",
+            argv[2]])
     else:
         copyfile(temp_name + ".camp.o", argv[2])
         os.remove(temp_name + ".camp.o")

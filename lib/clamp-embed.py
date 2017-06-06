@@ -43,8 +43,6 @@ if __name__ == "__main__":
         os.remove(argv[1] + ".S")
     else:
         if os.name == "nt":
-            #Maybe there's a native windows tool?
-            #This compiles but probably doesn't work
             check_call(["objcopy",
                 "-B",
                 "i386:x86-64",
@@ -69,3 +67,5 @@ if __name__ == "__main__":
                 argv[1],
                 argv[2]])
     exit(0)
+
+        
