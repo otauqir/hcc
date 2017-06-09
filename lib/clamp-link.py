@@ -58,18 +58,18 @@ if __name__ == "__main__":
         objs_to_process = []
      
         if arg.endswith(".cpu"):
-            copyfile(arg, temp_dir + "/kernel_cpu.o")
-            link_cpu_args.append(temp_dir + "/kernel_cpu.o")
+            copyfile(arg, temp_dir + "/kernel_cpu" + obj_ext)
+            link_cpu_args.append(temp_dir + "/kernel_cpu" + obj_ext)
 
-        elif arg[-2:].endswith(obj_ext):
+        elif arg.endswith(obj_ext):
             if verbose == 2:
                 print("detect object file to process further: %s" % arg)
             objs_to_process.append(arg)
 
-        elif (arg[:2] == "-l") or arg[-2:].endswith(sl_ext):
+        elif (arg.startswith("-l") or arg.endswith(sl_ext)):
             detected_static_library = ""
 
-            if arg[:2].startswith("-l"):
+            if arg.startswith("-l"):
                 if os.name == "nt":
                     static_lib_name = arg[2:] + sl_ext
                 else:
@@ -118,7 +118,7 @@ if __name__ == "__main__":
                         detected_static_library],
                         stdout = PIPE)
                 p2 = Popen(["grep",
-                    "-q",\
+                    "-q",
                     "\.kernel"],
                     stdin=p1.stdout)
                 p1.stdout.close()
@@ -175,7 +175,7 @@ if __name__ == "__main__":
                     detected_static_library],
                     stdout = PIPE)
             p2 = Popen(["grep",
-                "-q",\
+                "-q",
                 "\.kernel"],
                 stdin=p1.stdout)
             p1.stdout.close()
@@ -186,7 +186,7 @@ if __name__ == "__main__":
                 file = os.path.basename(obj)
                 filename = os.path.splitext(file)[0]
                 kernel_file = temp_dir + '/' + filename + ".kernel.bc"
-                host_file = temp_dir + '/' + filename + ".host.o"
+                host_file = temp_dir + '/' + filename + ".host" + obj_ext
 
                 check_call(["objcopy",
                     "-O",
@@ -266,12 +266,12 @@ if __name__ == "__main__":
         if verbose in [1, 2]:
             print("Generating AMD GCN kernel")
         
-        f = open(temp_dir + "/__empty.o", "w")
+        f = open(temp_dir + "/__empty" + obj_ext, "w")
         f.close()
 
-        clang_offload_bundler_input_args = "-inputs=" + temp_dir + "/__empty.o"
+        clang_offload_bundler_input_args = "-inputs=" + temp_dir + "/__empty" + obj_ext
         if os.name == "nt":
-            clang_offload_bundler_targets_args = "-targets=i686-pc-windows-msvc"
+            clang_offload_bundler_targets_args = "-targets=host-i686-pc-windows-msvc"
         else:
             clang_offload_bundler_targets_args = "-targets=host-x86_64-unknown-linux"
         
@@ -296,21 +296,34 @@ if __name__ == "__main__":
         check_call(["python",
             clamp_embed,
             "kernel.bundle",
-            "kernel_hsa.o"])
+            "kernel_hsa" + obj_ext])
         os.chdir(current_dir)
 
-        command = ["ld", "--allow-multiple-definition", temp_dir + "/kernel_hsa.o"]
+        if os.name == "nt":
+            command = ["link",
+                "libcmt.lib",
+                "libcpmt.lib",
+                "msvcprt.lib",
+                "vcruntime.lib",
+                "/force:multiple",
+                "/ignore:4006",
+                "/subsystem:console",
+                "/out:saxpy.exe",
+                temp_dir + "/kernel_hsa" + obj_ext]
+        else:
+            command = ["ld", "--allow-multiple-definition", temp_dir + "/kernel_hsa" + obj_ext]
+            command += link_other_args
+
         command += link_host_args
         command += link_cpu_args
-        command += link_other_args
-        check_call(command)
+        call(command)
 
-        if os.path.isfile(temp_dir + "/kernel_hsa.o"):
-            os.remove(temp_dir + "/kernel_hsa.o")
-        if os.path.isfile(temp_dir + "/kernel_cpu.o"):
-            os.remove(temp_dir + "/kernel_cpu.o")
-        if os.path.isfile(temp_dir + "/__empty.o"):
-            os.remove(temp_dir + "/__empty.o")
+        if os.path.isfile(temp_dir + "/kernel_hsa" + obj_ext):
+            os.remove(temp_dir + "/kernel_hsa" + obj_ext)
+        if os.path.isfile(temp_dir + "/kernel_cpu" + obj_ext):
+            os.remove(temp_dir + "/kernel_cpu" + obj_ext)
+        if os.path.isfile(temp_dir + "/__empty" + obj_ext):
+            os.remove(temp_dir + "/__empty" + obj_ext)
         if os.path.isfile(temp_dir + "/kernel.bundle"):
             os.remove(temp_dir + "/kernel.bundle")
         for f in os.listdir(temp_dir):
