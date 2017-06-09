@@ -4,21 +4,19 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-
 #include <iostream>
 #include <string>
 #include <cassert>
 #include <cstddef>
 #include <tuple>
 
-#include <amp.h>
+#include "amp.h"
 #include <mutex>
 
 #include "mcwamp_impl.hpp"
-//#include "hc_rt_debug.h"
 
 #ifdef linux
-  #include <dlfcn.h>
+	#include <dlfcn.h>
   #define LOAD_LIBRARY(LIBRARY_NAME) dlopen((LIBRARY_NAME), RTLD_LAZY|RTLD_NODELETE)
   #define LOAD_FUNCTION(LIBRARY_HANDLE, FUNC_NAME) dlsym((LIBRARY_HANDLE), (FUNC_NAME))
   #define CLOSE_LIBRARY(LIBRARY_HANDLE) dlclose((LIBRARY_HANDLE))
@@ -38,7 +36,9 @@
     #define LIBRARY_ERROR() 0
   #endif
 #endif
+
 #include "hc.hpp"
+
 
 namespace Concurrency {
 
@@ -63,10 +63,8 @@ struct RuntimeImpl {
     m_GetContextImpl(nullptr),
     isCPU(false) {
     //std::cout << "dlopen(" << libraryName << ")\n";
-    //m_RuntimeHandle = dlopen(libraryName, RTLD_LAZY|RTLD_NODELETE);
     m_RuntimeHandle = LOAD_LIBRARY(libraryName);
     if (!m_RuntimeHandle) {
-      //std::cerr << "C++AMP runtime load error: " << dlerror() << std::endl;
       std::cerr << "C++AMP runtime load error: " << LIBRARY_ERROR() << std::endl;
       return;
     }
@@ -75,16 +73,12 @@ struct RuntimeImpl {
 
   ~RuntimeImpl() {
     if (m_RuntimeHandle) {
-      //dlclose(m_RuntimeHandle);
       CLOSE_LIBRARY(m_RuntimeHandle);
     }
   }
 
   // load symbols from C++AMP runtime implementation
   void LoadSymbols() {
-    /*m_PushArgImpl = (PushArgImpl_t) dlsym(m_RuntimeHandle, "PushArgImpl");
-    m_PushArgPtrImpl = (PushArgPtrImpl_t) dlsym(m_RuntimeHandle, "PushArgPtrImpl");
-    m_GetContextImpl= (GetContextImpl_t) dlsym(m_RuntimeHandle, "GetContextImpl");*/
     m_PushArgImpl = (PushArgImpl_t) LOAD_FUNCTION(m_RuntimeHandle, "PushArgImpl");
     m_PushArgPtrImpl = (PushArgPtrImpl_t) LOAD_FUNCTION(m_RuntimeHandle, "PushArgPtrImpl");
     m_GetContextImpl= (GetContextImpl_t) LOAD_FUNCTION(m_RuntimeHandle, "GetContextImpl");
@@ -133,17 +127,14 @@ public:
     // detect if C++AMP runtime is available and
     // whether all platform library dependencies are satisfied
     //std::cout << "dlopen(" << m_ampRuntimeLibrary << ")\n";
-    //handle = dlopen(m_ampRuntimeLibrary.c_str(), RTLD_LAZY|RTLD_NODELETE);
-    handle = LOAD_LIBRARY(m_ampRuntimeLibrary.c_str());
+	handle = LOAD_LIBRARY(m_ampRuntimeLibrary.c_str());
     if (!handle) {
       //std::cout << " C++AMP runtime not found" << std::endl;
       //std::cout << dlerror() << std::endl;
       return false;
     }
-    //dlerror();  // clear any existing error
     LIBRARY_ERROR();  // clear any existing error
     //std::cout << " C++AMP runtime found" << std::endl;
-    //dlclose(handle);
     CLOSE_LIBRARY(handle);
 
     return true;
@@ -288,7 +279,6 @@ static inline uint64_t Read8byteIntegerFromBuffer(const char *data, size_t pos) 
 }
 
 #define RUNTIME_ERROR(val, error_string, line) { \
-  hc::print_backtrace(); \
   printf("### HCC RUNTIME ERROR: %s at file:%s line:%d\n", error_string, __FILE__, line); \
   exit(val); \
 }
@@ -387,8 +377,7 @@ void BuildProgram(KalmarQueue* pQueue) {
 
 // used in parallel_for_each.h
 void *CreateKernel(std::string s, KalmarQueue* pQueue) {
-  // TODO - should create a HSAQueue:: CreateKernel member function that creates and returns a dispatch.
-  return pQueue->getDev()->CreateKernel(s.c_str(), pQueue);
+  return pQueue->getDev()->CreateKernel(s.c_str());
 }
 
 void PushArg(void *k_, int idx, size_t sz, const void *s) {
@@ -454,7 +443,7 @@ static inline std::uint32_t f32_as_u32(float f) { union { float f; std::uint32_t
 static inline float u32_as_f32(std::uint32_t u) { union { float f; std::uint32_t u; } v; v.u = u; return v.f; }
 static inline int clamp_int(int i, int l, int h) { return std::min(std::max(i, l), h); }
 
-// half à float, the f16 is in the low 16 bits of the input argument ¿a¿
+// half ï¿½ float, the f16 is in the low 16 bits of the input argument ï¿½aï¿½
 static inline float __convert_half_to_float(std::uint32_t a) noexcept {
   std::uint32_t u = ((a << 13) + 0x70000000U) & 0x8fffe000U;
   std::uint32_t v = f32_as_u32(u32_as_f32(u) * 0x1.0p+112f) + 0x38000000U;
@@ -462,7 +451,7 @@ static inline float __convert_half_to_float(std::uint32_t a) noexcept {
   return u32_as_f32(u) * 0x1.0p-112f;
 }
 
-// float à half with nearest even rounding
+// float ï¿½ half with nearest even rounding
 // The lower 16 bits of the result is the bit pattern for the f16
 static inline std::uint32_t __convert_float_to_half(float a) noexcept {
   std::uint32_t u = f32_as_u32(a);
@@ -488,3 +477,4 @@ extern "C" float __gnu_h2f_ieee(unsigned short h){
 extern "C" unsigned short __gnu_f2h_ieee(float f){
   return (unsigned short)__convert_float_to_half(f);
 }
+
