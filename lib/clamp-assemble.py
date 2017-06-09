@@ -25,33 +25,18 @@ if __name__ == "__main__":
     if os.path.isfile(argv[2]):
         copyfile(argv[2], argv[2] + ".host.o")
         os.remove(argv[2])
+
         check_call(["python",
             embed,
             argv[1],
             argv[2] + ".kernel.o"])
-
-        if os.name == "nt": #Windows
-            check_call(["LINK",
-                "/NODEFAULTLIB:msvcrt.lib",
-                #"/FORCE:MULTIPLE",
-                "/INCREMENTAL",
-                "/SUBSYSTEM:CONSOLE",
-                "/IGNORE:4006",
-                "/LIBPATH:C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\lib\amd64",
-                "libcmt.lib",
-                "vcruntime.lib",
-                "/VERBOSE:Lib",
-                "/MACHINE:X86",
-                argv[2] + ".kernel.o",
-                argv[2] + ".host.o",
-                "/OUT:" + argv[2]])
-        else: #Linux
-            check_call(["ld",
-                "-r",
-                argv[2] + ".kernel.o",
-                argv[2] + ".host.o",
-                "-o",
-                argv[2]])
+            
+        check_call(["ld",
+            "-r",
+            argv[2] + ".kernel.o",
+            argv[2] + ".host.o",
+            "-o",
+            argv[2]])
 
         os.remove(argv[2] + ".kernel.o")
         os.remove(argv[2] + ".host.o")
@@ -62,5 +47,4 @@ if __name__ == "__main__":
             argv[2]])
 
     exit(0)
-
 

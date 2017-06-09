@@ -44,10 +44,10 @@ if __name__ == "__main__":
     #not sure if this works as inteneded
     f0 = open(temp_name + ".ll", "rb")
     if os.name == "nt":
-        f1 = open("nul", "wb")
+        f1 = open("nul", "ab")
         ext = ".dll"
     else:
-        f1 = open("/dev/null", "wb")
+        f1 = open("/dev/null", "ab")
         ext = ".so"
     f2 = open(temp_name + ".host_redirect.ll", "wb")
     check_call([opt,
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         command.append(temp_name + ".host_redirect.bc")
         check_call(command)
     else:
-        os.symlink(argv[1], argv[1] + ".bc")
+        os.link(argv[1], argv[1] + ".bc")
         command.append(argv[1] + ".bc")
         check_call(command)
     
