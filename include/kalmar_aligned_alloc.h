@@ -27,7 +27,11 @@ inline void* kalmar_aligned_alloc(std::size_t alignment, std::size_t size) noexc
     }
     void* memptr = NULL;
     // posix_memalign shall return 0 upon successfully allocate aligned memory
-    posix_memalign(&memptr, alignment, size);
+    #ifdef linux //linux
+        posix_memalign(&memptr, alignment, size);
+    #elif _WIN32 //windows
+        memptr = _aligned_malloc(alignment, size);
+    #endif
     assert(memptr);
 
     return memptr;
